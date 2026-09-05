@@ -44,3 +44,11 @@ DEPARTMENTS = [
     'IT',
     'R&D'
 ]
+
+# AI Configuration (Google Gemini & Heuristic Fallback)
+AI_CONFIG = {
+    'api_key': os.getenv('GEMINI_API_KEY', ''),
+    'model': os.getenv('GEMINI_MODEL', 'gemini-flash-lite-latest'),
+    'temperature': float(os.getenv('GEMINI_TEMPERATURE', '0.2')),
+    'max_output_tokens': int(os.getenv('GEMINI_MAX_TOKENS', '8192'))
+}

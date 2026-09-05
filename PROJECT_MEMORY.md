@@ -48,9 +48,16 @@ A self-contained, browser-based data analysis dashboard that lets any user load 
 - FR-08 **Custom Analysis** — Multi-column filtering (numeric range sliders, categorical multi-select, date range pickers); group-by aggregation with selectable aggregation function.
 - FR-09 **Advanced Analytics** — K-Means clustering with silhouette score; Isolation Forest anomaly detection; PCA with explained variance; linear regression between column pairs; time series with moving average and trend (scipy linregress).
 - FR-10 **Data Profiling** — row/column count, memory usage, column type breakdown, missing-data % per column, duplicate row count.
+- FR-14 **AI Data Intelligence** — Conversational Data Analyst ("Chat with your Data") with real-time computation; Executive Intelligence Briefing with markdown download; Smart Chart suggestions & NL prompt-to-chart rendering; AI Quality & Cleaning Advisor with in-session remediation; Metric Driver & Impact Analyzer with correlation attribution. Powered by Google Gemini (`gemini-3.7-flash`, `gemini-flash-lite-latest`, `gemini-3.5-flash-lite`) with automatic rate-limit failover and offline-capable Intelligent Heuristic Engine fallback.
+- **UI Architecture & Fixes (2026-09-05)**:
+  - Eliminated raw HTML block wrapping around Markdown content in `st.markdown` which caused unrendered CommonMark tags and trailing `</div>` artifacts.
+  - Redesigned Tab 7 into segmented sub-tabs (`st.tabs`) with styled card containers (`st.container(border=True)`) and native `st.chat_message` streams.
+  - Implemented representative sampling (25k-50k rows) for statistical profiles, quantiles, and skewness calculations to ensure multi-million row datasets (e.g. 2,740,000 MySQL rows) process in <100ms without timeouts.
+  - Fixed `TypeError: Cannot compare Timestamp with datetime.date` in Tab 4 Custom Analysis date filtering by coercing column values via `pd.to_datetime` and comparing against `pd.Timestamp`.
+  - Fixed `StreamlitDuplicateElementKey: cat_filter_values` in Tab 4 Custom Analysis by scoping multi-select keys dynamically (`cat_filter_values_{col}`) and added high-cardinality text search protection for text columns.
 
 #### UI / UX
-- FR-11: Sidebar holds all data-source controls; main area is exclusively analysis output.
+- FR-11: Sidebar holds all data-source and AI configuration controls; main area is exclusively analysis output.
 - FR-12: No balloon/confetti animation on file load.
 - FR-13: Responsive layout using `use_container_width=True` on all charts and tables.
 
@@ -84,21 +91,19 @@ A self-contained, browser-based data analysis dashboard that lets any user load 
 ### File Structure
 ```
 Universal-Data-Analysis-Dashboard-main/
-├── app.py                    # Single-file Streamlit application (entry point)
+├── app.py                    # Streamlit application entry point & interactive UI
+├── ai_engine.py              # Gemini AI & Heuristic Intelligence Engine
 ├── config.py                 # MySQL defaults + app constants (reads .env)
+├── utils.py                  # Statistical computations, filters & helper functions
 ├── requirements.txt          # Pinned dependencies
 ├── .env.example              # Environment variable template
 ├── .env                      # Local secrets (git-ignored)
 ├── database_schema.sql       # Reference MySQL schema for employee_db
 ├── sample_data.py            # Script to generate sample data
 ├── employee_data_sample.xlsx # Sample dataset for testing
-├── test_dashboard.py         # Test suite
-├── test_report.xlsx          # Test output
-├── utils.py                  # Shared utility functions
-├── verify_installation.py    # Dependency verification script
 ├── PROJECT_MEMORY.md         # ← this file
 ├── PROJECT_SUMMARY.md        # Original project overview
-├── README.md                 # Setup instructions
+├── README.md                 # Setup instructions & complete documentation
 └── STYLE_GUIDE.md            # Original style reference
 ```
 

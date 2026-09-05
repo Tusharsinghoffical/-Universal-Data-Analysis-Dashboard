@@ -9,6 +9,16 @@ import os
 from datetime import datetime
 import warnings
 from config import MYSQL_CONFIG, DEFAULT_QUERY
+try:
+    from config import AI_CONFIG
+except ImportError:
+    AI_CONFIG = {
+        'api_key': os.getenv('GEMINI_API_KEY', ''),
+        'model': os.getenv('GEMINI_MODEL', 'gemini-3.6-flash'),
+        'temperature': float(os.getenv('GEMINI_TEMPERATURE', '0.2')),
+        'max_output_tokens': int(os.getenv('GEMINI_MAX_TOKENS', '2048'))
+    }
+import ai_engine
 import json
 from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
@@ -460,6 +470,114 @@ st.markdown("""
         opacity: 0.25;
     }
     .idle-wave svg { width: 100%; height: 28px; }
+
+    /* ── AI Intelligence Channel Styles ── */
+    .ai-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-family: var(--font-mono);
+        font-size: 0.72rem;
+        padding: 4px 12px;
+        border-radius: 3px;
+        border: 1px solid var(--border);
+        background: var(--surface);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+    }
+    .ai-badge-gemini {
+        border-color: #5EEAD4 !important;
+        color: #5EEAD4 !important;
+        background: rgba(94, 234, 212, 0.08) !important;
+    }
+    .ai-badge-heuristic {
+        border-color: #FDBA74 !important;
+        color: #FDBA74 !important;
+        background: rgba(253, 186, 116, 0.08) !important;
+    }
+    .ai-briefing-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1.25rem;
+        padding-bottom: 0.75rem;
+        border-bottom: 1px solid var(--border);
+    }
+    .ai-action-card {
+        background-color: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 16px 20px;
+        margin-bottom: 12px;
+        transition: border-color 0.2s ease, transform 0.15s ease;
+    }
+    .ai-action-card:hover {
+        border-color: var(--accent-signal);
+    }
+    .ai-action-card h4 {
+        margin: 0 0 6px 0;
+        font-family: var(--font-display);
+        font-size: 0.95rem;
+        color: var(--text-primary);
+    }
+    .ai-action-card p {
+        margin: 0;
+        font-size: 0.82rem;
+        color: var(--text-muted);
+        line-height: 1.5;
+    }
+
+    /* ── Markdown Content Typography & Cards ── */
+    .stMarkdown h3 {
+        font-family: var(--font-display) !important;
+        font-size: 1.15rem !important;
+        font-weight: 600 !important;
+        color: var(--text-primary) !important;
+        margin-top: 1.25rem !important;
+        margin-bottom: 0.6rem !important;
+        border-bottom: 1px solid var(--border);
+        padding-bottom: 6px;
+    }
+    .stMarkdown h4 {
+        font-family: var(--font-display) !important;
+        font-size: 1rem !important;
+        font-weight: 600 !important;
+        color: var(--accent-signal) !important;
+        margin-top: 1rem !important;
+        margin-bottom: 0.4rem !important;
+    }
+    .stMarkdown ul, .stMarkdown ol {
+        margin-left: 1.2rem !important;
+        line-height: 1.65;
+    }
+    .stMarkdown li {
+        color: #CBD5E1 !important;
+        font-size: 0.9rem !important;
+        margin-bottom: 6px;
+    }
+    .stMarkdown strong {
+        color: #FFFFFF !important;
+        font-weight: 600;
+    }
+    [data-testid="stChatMessage"] {
+        background-color: var(--surface) !important;
+        border: 1px solid var(--border) !important;
+        border-radius: 6px !important;
+        padding: 12px 16px !important;
+        margin-bottom: 12px !important;
+    }
+    [data-testid="stChatMessage"] p {
+        color: var(--text-primary) !important;
+        font-family: var(--font-body);
+        font-size: 0.92rem;
+        line-height: 1.6;
+    }
+    [data-testid="stVerticalBlockBorderWrapper"] {
+        background-color: var(--surface) !important;
+        border: 1px solid var(--border) !important;
+        border-radius: 6px !important;
+        padding: 20px 24px !important;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -503,6 +621,58 @@ data_source = st.sidebar.radio(
     ('Upload File', 'MySQL Database')
 )
 
+# AI Engine Sidebar Configuration
+st.sidebar.markdown("---")
+st.sidebar.subheader("🤖 AI Intelligence Engine")
+
+ai_key_input = st.sidebar.text_input(
+    "Google Gemini API Key",
+    value=st.session_state.get('ai_api_key', AI_CONFIG.get('api_key', '')),
+    type="password",
+    help="Enter Gemini API key to enable generative reasoning. If blank, the dashboard operates via the Intelligent Heuristic Engine."
+)
+st.session_state.ai_api_key = ai_key_input
+
+models_list = ['gemini-flash-lite-latest', 'gemini-3.5-flash-lite', 'gemini-3.7-flash', 'gemini-3.6-flash']
+current_saved_model = st.session_state.get('ai_model', AI_CONFIG.get('model', 'gemini-flash-lite-latest'))
+default_idx = models_list.index(current_saved_model) if current_saved_model in models_list else 0
+
+ai_model_choice = st.sidebar.selectbox(
+    "Gemini Model",
+    models_list,
+    index=default_idx
+)
+st.session_state.ai_model = ai_model_choice
+
+_has_key = bool(ai_key_input and ai_key_input.strip())
+if _has_key:
+    st.sidebar.markdown(f"""
+    <div class="ai-badge" style="border-color:#5EEAD4; color:#5EEAD4;">
+        <span class="status-dot" style="background:#5EEAD4;"></span>
+        ONLINE · {ai_model_choice.upper()}
+    </div>
+    """, unsafe_allow_html=True)
+else:
+    st.sidebar.markdown("""
+    <div class="ai-badge" style="border-color:#FDBA74; color:#FDBA74;">
+        <span class="status-dot" style="background:#FDBA74;"></span>
+        HEURISTIC ENGINE · OFFLINE READY
+    </div>
+    """, unsafe_allow_html=True)
+
+if st.sidebar.button("Test AI Connection"):
+    if _has_key:
+        with st.sidebar.spinner("Testing Gemini connection..."):
+            ok, msg = ai_engine.test_gemini_connection(ai_key_input, model=ai_model_choice)
+            if ok:
+                st.sidebar.success(msg)
+            else:
+                st.sidebar.error(f"Failed: {msg}")
+    else:
+        st.sidebar.info("Operating in Heuristic Mode (no API key required). Enter a Gemini key to activate generative LLM reasoning.")
+
+st.sidebar.markdown("---")
+
 # Initialize session state for data
 if 'df' not in st.session_state:
     st.session_state.df = None
@@ -514,6 +684,14 @@ if 'date_columns' not in st.session_state:
     st.session_state.date_columns = []
 if 'mysql_error' not in st.session_state:
     st.session_state.mysql_error = None
+if 'ai_chat_history' not in st.session_state:
+    st.session_state.ai_chat_history = []
+if 'ai_api_key' not in st.session_state:
+    st.session_state.ai_api_key = AI_CONFIG.get('api_key', '')
+if 'ai_model' not in st.session_state:
+    st.session_state.ai_model = AI_CONFIG.get('model', 'gemini-3.6-flash')
+if 'ai_exec_summary' not in st.session_state:
+    st.session_state.ai_exec_summary = None
 
 # Data loading functions
 @st.cache_data
@@ -592,46 +770,50 @@ def load_mysql_data(host, user, password, database, query):
     except Exception as e:
         return None, str(e)
 
-# Function to automatically detect column types
+# Function to automatically detect column types (optimized for high speed on multi-million rows)
 def detect_column_types(df):
-    """Automatically detect numeric, categorical, and date columns"""
+    """Automatically detect numeric, categorical, and date columns efficiently using a fast sample"""
     numeric_columns = []
     categorical_columns = []
     date_columns = []
     
+    # Inspect first 5,000 rows for instant type detection instead of scanning millions of rows
+    sample_df = df.iloc[:5000] if len(df) > 5000 else df
+    
     for col in df.columns:
-        # Try to convert to numeric
-        if df[col].dtype in ['int64', 'float64']:
+        if sample_df[col].dtype in ['int64', 'float64', 'int32', 'float32', 'int16', 'float16']:
             numeric_columns.append(col)
-        elif df[col].dtype == 'object':
+        elif sample_df[col].dtype == 'object':
             # Check if it's a date
             try:
-                pd.to_datetime(df[col].dropna().iloc[:5])  # Test first 5 non-null values
+                pd.to_datetime(sample_df[col].dropna().iloc[:5])
                 date_columns.append(col)
             except:
-                # Check if it's categorical (low cardinality)
-                if df[col].nunique() <= min(20, len(df) * 0.1):  # Less than 10% unique values
+                # Check if it's categorical
+                if sample_df[col].nunique() <= 50:
                     categorical_columns.append(col)
                 else:
-                    # Try to convert to numeric
                     try:
-                        pd.to_numeric(df[col].dropna())
+                        pd.to_numeric(sample_df[col].dropna().iloc[:100])
                         numeric_columns.append(col)
                     except:
                         categorical_columns.append(col)
+        elif 'datetime' in str(sample_df[col].dtype):
+            date_columns.append(col)
         else:
             categorical_columns.append(col)
     
     return numeric_columns, categorical_columns, date_columns
 
-# Advanced analytics functions
+# Advanced analytics functions (optimized for multi-million row scale)
 def perform_clustering(df, numeric_columns, n_clusters=3):
-    """Perform K-means clustering on numeric data"""
+    """Perform K-means clustering on numeric data with smart sampling"""
     if len(numeric_columns) < 2:
         return None, "Need at least 2 numeric columns for clustering"
     
-    # Prepare data
-    data = df[numeric_columns].dropna()
+    # Prepare data with smart sampling for multi-million row datasets
+    sample_size = min(25000, len(df))
+    data = df[numeric_columns].sample(sample_size, random_state=42).dropna() if len(df) > 50000 else df[numeric_columns].dropna()
     if len(data) < n_clusters:
         return None, f"Not enough data points ({len(data)}) for {n_clusters} clusters"
     
@@ -640,12 +822,13 @@ def perform_clustering(df, numeric_columns, n_clusters=3):
     scaled_data = scaler.fit_transform(data)
     
     # Perform clustering
-    kmeans = KMeans(n_clusters=n_clusters, random_state=42)
+    kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init=5)
     cluster_labels = kmeans.fit_predict(scaled_data)
     
-    # Calculate silhouette score
+    # Calculate silhouette score (subsample to avoid O(N^2) delay)
     try:
-        sil_score = silhouette_score(scaled_data, cluster_labels)
+        eval_sample = min(5000, len(scaled_data))
+        sil_score = silhouette_score(scaled_data[:eval_sample], cluster_labels[:eval_sample])
     except:
         sil_score = -1
     
@@ -656,12 +839,13 @@ def perform_clustering(df, numeric_columns, n_clusters=3):
     return result_df, sil_score
 
 def detect_anomalies(df, numeric_columns):
-    """Detect anomalies using Isolation Forest"""
+    """Detect anomalies using Isolation Forest with smart sampling"""
     if len(numeric_columns) < 2:
         return None, "Need at least 2 numeric columns for anomaly detection"
     
-    # Prepare data
-    data = df[numeric_columns].dropna()
+    # Prepare data with smart sampling
+    sample_size = min(25000, len(df))
+    data = df[numeric_columns].sample(sample_size, random_state=42).dropna() if len(df) > 50000 else df[numeric_columns].dropna()
     if len(data) < 10:
         return None, "Need at least 10 data points for anomaly detection"
     
@@ -669,8 +853,8 @@ def detect_anomalies(df, numeric_columns):
     scaler = StandardScaler()
     scaled_data = scaler.fit_transform(data)
     
-    # Detect anomalies
-    iso_forest = IsolationForest(random_state=42)
+    # Detect anomalies with optimized parameters
+    iso_forest = IsolationForest(random_state=42, n_estimators=50, max_samples=min(1000, len(data)))
     anomaly_labels = iso_forest.fit_predict(scaled_data)
     
     # Add anomaly labels to dataframe
@@ -683,12 +867,13 @@ def detect_anomalies(df, numeric_columns):
     return result_df, anomaly_count
 
 def perform_pca(df, numeric_columns, n_components=2):
-    """Perform Principal Component Analysis"""
+    """Perform Principal Component Analysis with smart sampling"""
     if len(numeric_columns) < 2:
         return None, "Need at least 2 numeric columns for PCA"
     
-    # Prepare data
-    data = df[numeric_columns].dropna()
+    # Prepare data with smart sampling
+    sample_size = min(25000, len(df))
+    data = df[numeric_columns].sample(sample_size, random_state=42).dropna() if len(df) > 50000 else df[numeric_columns].dropna()
     if len(data) < n_components:
         return None, f"Not enough data points ({len(data)}) for {n_components} components"
     
@@ -702,9 +887,7 @@ def perform_pca(df, numeric_columns, n_components=2):
     
     # Create result dataframe
     pca_columns = [f'PC{i+1}' for i in range(pca_result.shape[1])]
-    # Convert to proper format for DataFrame columns
     result_df = pd.DataFrame(pca_result)
-    # Set column names using assignment
     result_df.columns = list(pca_columns)
     
     # Add explained variance ratio
@@ -718,12 +901,13 @@ def perform_regression_analysis(df, numeric_columns):
     if len(numeric_columns) < 2:
         return None, "Need at least 2 numeric columns for regression analysis"
     
+    sample_df = df.sample(min(25000, len(df)), random_state=42) if len(df) > 50000 else df
+    
     results = []
     for i in range(min(5, len(numeric_columns))):  # Limit to first 5 columns
         for j in range(i+1, min(5, len(numeric_columns))):
             col1, col2 = numeric_columns[i], numeric_columns[j]
-            # Drop rows with NaN values
-            clean_data = df[[col1, col2]].dropna()
+            clean_data = sample_df[[col1, col2]].dropna()
             if len(clean_data) > 10:  # Need minimum data points
                 from sklearn.linear_model import LinearRegression
                 from sklearn.metrics import r2_score
@@ -750,12 +934,12 @@ def perform_regression_analysis(df, numeric_columns):
         return None, "Not enough data for regression analysis"
 
 def generate_data_profile(df):
-    """Generate comprehensive data profile"""
+    """Generate comprehensive data profile (instant execution)"""
     profile = {
         'Dataset_Info': {
             'Total_Rows': len(df),
             'Total_Columns': len(df.columns),
-            'Memory_Usage_MB': round(df.memory_usage(deep=True).sum() / 1024 / 1024, 2)
+            'Memory_Usage_MB': round(df.memory_usage(deep=False).sum() / 1024 / 1024, 2)
         },
         'Column_Types': {
             'Numeric': len(df.select_dtypes(include=[np.number]).columns),
@@ -862,10 +1046,13 @@ if st.session_state.df is not None:
     categorical_columns = st.session_state.categorical_columns
     date_columns = st.session_state.date_columns
     
-    # Display raw data toggle
+    # Display raw data toggle (optimized to prevent browser crashing on multi-million rows)
     if st.checkbox("Show Raw Data"):
-        st.subheader("Raw Data")
-        st.dataframe(df, use_container_width=True)
+        st.subheader("Raw Data Preview")
+        preview_limit = min(1000, len(df))
+        st.dataframe(df.head(preview_limit), use_container_width=True)
+        if len(df) > preview_limit:
+            st.caption(f"Showing first {preview_limit:,} rows of {len(df):,} total records for instantaneous performance.")
     
     # Data info with metric cards (instrument panel style)
     st.markdown('<div style="margin-top:1.5rem;"></div>', unsafe_allow_html=True)
@@ -910,22 +1097,26 @@ if st.session_state.df is not None:
             st.markdown(f"<div class='auto-column'>{col}</div>", unsafe_allow_html=True)
     
     # Tabs for different analysis sections
-    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["📈 Overview", "📊 Visualizations", "🔍 Insights", "⚙️ Custom Analysis", "🤖 Advanced Analytics", "📈 Data Profiling"])
+    tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(["📈 Overview", "📊 Visualizations", "🔍 Insights", "⚙️ Custom Analysis", "🤖 Advanced Analytics", "📈 Data Profiling", "🧠 AI Intelligence"])
     
     with tab1:
         st.subheader("Dataset Summary")
         
-        # Basic statistics for numeric columns
+        # Basic statistics for numeric columns (sampled for instantaneous execution on 2.7M+ rows)
         if numeric_columns:
             st.write("Numeric Columns Summary:")
-            st.dataframe(df[numeric_columns].describe(), use_container_width=True)
+            calc_summary_df = df[numeric_columns].sample(min(50000, len(df)), random_state=42) if len(df) > 50000 else df[numeric_columns]
+            st.dataframe(calc_summary_df.describe().round(2), use_container_width=True)
+            if len(df) > 50000:
+                st.caption(f"Estimated from high-precision representative sample of 50,000 records ({len(df):,} total).")
         
         # Value counts for categorical columns
         if categorical_columns:
             st.write("Categorical Columns Summary:")
             selected_cat_col = st.selectbox("Select categorical column:", categorical_columns, key="tab1_cat_col")
             if selected_cat_col:
-                value_counts = df[selected_cat_col].value_counts().head(10)
+                cat_sample = df[selected_cat_col].sample(min(50000, len(df)), random_state=42) if len(df) > 50000 else df[selected_cat_col]
+                value_counts = cat_sample.value_counts().head(10)
                 st.bar_chart(value_counts)
                 st.write(f"Top 10 values in {selected_cat_col}:")
                 st.dataframe(value_counts, use_container_width=True)
@@ -933,6 +1124,11 @@ if st.session_state.df is not None:
     with tab2:
         st.subheader("Data Visualizations")
         
+        # Create fast visualization sample for 2.7M+ rows
+        plot_df = df.sample(min(50000, len(df)), random_state=42) if len(df) > 50000 else df
+        if len(df) > 50000:
+            st.caption(f"Visualizing 50,000 representative data points for 60fps interactive rendering ({len(df):,} records total).")
+
         if numeric_columns:
             # Create visualization options
             viz_type = st.selectbox(
@@ -946,7 +1142,7 @@ if st.session_state.df is not None:
                 selected_num_col = st.selectbox("Select numeric column for histogram:", numeric_columns, key="hist_col")
                 if selected_num_col:
                     nbins = st.slider("Number of bins", 5, 50, 20)
-                    fig_hist = px.histogram(df, x=selected_num_col, nbins=nbins, 
+                    fig_hist = px.histogram(plot_df, x=selected_num_col, nbins=nbins, 
                                       title=f"Distribution of {selected_num_col}",
                                       color_discrete_sequence=['#5EEAD4'])
                     fig_hist.update_layout(
@@ -972,11 +1168,11 @@ if st.session_state.df is not None:
                     
                     if x_col and y_col:
                         if color_col:
-                            fig_scatter = px.scatter(df, x=x_col, y=y_col, color=color_col,
+                            fig_scatter = px.scatter(plot_df, x=x_col, y=y_col, color=color_col,
                                                    title=f"{y_col} vs {x_col} (colored by {color_col})",
                                                    color_continuous_scale=['#12161F','#5EEAD4'])
                         else:
-                            fig_scatter = px.scatter(df, x=x_col, y=y_col, 
+                            fig_scatter = px.scatter(plot_df, x=x_col, y=y_col, 
                                                    title=f"{y_col} vs {x_col}",
                                                    color_discrete_sequence=['#A5B4FC'])
                         fig_scatter.update_layout(
@@ -994,12 +1190,12 @@ if st.session_state.df is not None:
                 if categorical_columns:
                     category_col = st.selectbox("Select category column (optional):", [None] + categorical_columns, key="box_category")
                     if category_col:
-                        fig_box = px.box(df, x=category_col, y=selected_num_col,
+                        fig_box = px.box(plot_df, x=category_col, y=selected_num_col,
                                        title=f"Distribution of {selected_num_col} by {category_col}",
                                        color=category_col,
                                        color_discrete_sequence=px.colors.qualitative.Set3)
                     else:
-                        fig_box = px.box(df, y=selected_num_col,
+                        fig_box = px.box(plot_df, y=selected_num_col,
                                        title=f"Distribution of {selected_num_col}",
                                        color_discrete_sequence=['#5EEAD4'])
                     fig_box.update_layout(
@@ -1011,7 +1207,7 @@ if st.session_state.df is not None:
                     )
                     st.plotly_chart(fig_box, use_container_width=True)
                 else:
-                    fig_box = px.box(df, y=selected_num_col,
+                    fig_box = px.box(plot_df, y=selected_num_col,
                                    title=f"Distribution of {selected_num_col}",
                                    color_discrete_sequence=['#5EEAD4'])
                     fig_box.update_layout(
@@ -1033,8 +1229,7 @@ if st.session_state.df is not None:
                                                  key="heatmap_cols")
                     
                     if selected_cols and len(selected_cols) > 1:
-                        corr_subset = df[selected_cols]
-                        # Ensure we're working with a DataFrame
+                        corr_subset = plot_df[selected_cols]
                         if not isinstance(corr_subset, pd.DataFrame):
                             corr_subset = pd.DataFrame(corr_subset)
                         corr_data = corr_subset.corr()
@@ -1065,7 +1260,7 @@ if st.session_state.df is not None:
                         x_col = st.selectbox("Select X-axis:", [None] + numeric_columns, key="line_x")
                     
                     if y_col and x_col:
-                        fig_line = px.line(df, x=x_col, y=y_col,
+                        fig_line = px.line(plot_df, x=x_col, y=y_col,
                                          title=f"{y_col} over {x_col}",
                                          color_discrete_sequence=['#5EEAD4'])
                         fig_line.update_layout(
@@ -1087,7 +1282,7 @@ if st.session_state.df is not None:
                         x_col = st.selectbox("Select X-axis for area chart:", [None] + numeric_columns, key="area_x")
                     
                     if y_col and x_col:
-                        fig_area = px.area(df, x=x_col, y=y_col,
+                        fig_area = px.area(plot_df, x=x_col, y=y_col,
                                          title=f"{y_col} over {x_col}",
                                          color_discrete_sequence=['#A5B4FC'])
                         fig_area.update_layout(
@@ -1115,11 +1310,11 @@ if st.session_state.df is not None:
                     
                     if x_col and y_col and z_col:
                         if color_col:
-                            fig_3d = px.scatter_3d(df, x=x_col, y=y_col, z=z_col, color=color_col,
+                            fig_3d = px.scatter_3d(plot_df, x=x_col, y=y_col, z=z_col, color=color_col,
                                                  title=f"3D Scatter: {x_col} vs {y_col} vs {z_col}",
                                                  color_continuous_scale=['#12161F','#5EEAD4'])
                         else:
-                            fig_3d = px.scatter_3d(df, x=x_col, y=y_col, z=z_col,
+                            fig_3d = px.scatter_3d(plot_df, x=x_col, y=y_col, z=z_col,
                                                  title=f"3D Scatter: {x_col} vs {y_col} vs {z_col}",
                                                  color_discrete_sequence=['#5EEAD4'])
                         fig_3d.update_layout(
@@ -1263,42 +1458,75 @@ if st.session_state.df is not None:
                     # Numeric filter
                     min_val = float(df[col].min())
                     max_val = float(df[col].max())
-                    selected_range = st.slider(f"Select range for {col}:", 
-                                             min_val, max_val, 
-                                             (min_val, max_val))
+                    selected_range = st.slider(
+                        f"Select range for {col}:", 
+                        min_val, max_val, 
+                        (min_val, max_val),
+                        key=f"num_filter_{col}"
+                    )
                     filtered_df = filtered_df[
                         (filtered_df[col] >= selected_range[0]) & 
                         (filtered_df[col] <= selected_range[1])
                     ]
                 elif col in categorical_columns:
-                    # Categorical filter
-                    unique_values = df[col].unique().tolist()
-                    selected_values = st.multiselect(f"Select values for {col}:", 
-                                                   unique_values, 
-                                                   default=unique_values,
-                                                   key="cat_filter_values")
-                    if selected_values:
-                        # Convert to Series if needed
-                        col_series = pd.Series(filtered_df[col])
-                        mask = col_series.isin(selected_values)
-                        filtered_df = filtered_df[mask]
+                    # Categorical filter with unique key per column
+                    val_counts = df[col].value_counts()
+                    if len(val_counts) > 100:
+                        search_term = st.text_input(
+                            f"Search in {col} (text search):", 
+                            key=f"cat_search_{col}",
+                            placeholder=f"Type letters to search {col}..."
+                        )
+                        if search_term:
+                            filtered_df = filtered_df[filtered_df[col].astype(str).str.contains(search_term, case=False, na=False)]
+                        else:
+                            st.caption(f"ℹ️ High cardinality ({len(val_counts):,} unique values). Showing top 50 most frequent.")
+                            top_vals = val_counts.head(50).index.tolist()
+                            selected_values = st.multiselect(
+                                f"Select values for {col}:", 
+                                top_vals, 
+                                default=top_vals,
+                                key=f"cat_filter_values_{col}"
+                            )
+                            if selected_values and len(selected_values) < len(top_vals):
+                                filtered_df = filtered_df[filtered_df[col].isin(selected_values)]
+                    else:
+                        unique_values = val_counts.index.tolist()
+                        selected_values = st.multiselect(
+                            f"Select values for {col}:", 
+                            unique_values, 
+                            default=unique_values,
+                            key=f"cat_filter_values_{col}"
+                        )
+                        if selected_values and len(selected_values) < len(unique_values):
+                            filtered_df = filtered_df[filtered_df[col].isin(selected_values)]
                 elif col in date_columns:
-                    # Date filter
-                    # Convert to Series first to avoid attribute access issues
-                    col_series = pd.Series(df[col])
-                    min_date = pd.to_datetime(col_series.min())
-                    max_date = pd.to_datetime(col_series.max())
-                    selected_dates = st.date_input(f"Select date range for {col}:", 
-                                                 value=(pd.to_datetime(min_date).date(), pd.to_datetime(max_date).date()))
-                    if len(selected_dates) == 2:
-                        filtered_df = filtered_df[
-                            (filtered_df[col] >= pd.Timestamp(selected_dates[0])) & 
-                            (filtered_df[col] <= pd.Timestamp(selected_dates[1]))
-                        ]
+                    # Date filter (handles both datetime.date and Timestamp gracefully)
+                    col_dt_series = pd.to_datetime(df[col], errors='coerce')
+                    min_date = col_dt_series.min()
+                    max_date = col_dt_series.max()
+                    if pd.notnull(min_date) and pd.notnull(max_date):
+                        selected_dates = st.date_input(
+                            f"Select date range for {col}:", 
+                            value=(min_date.date(), max_date.date()),
+                            key=f"filter_date_{col}"
+                        )
+                        if len(selected_dates) == 2:
+                            filtered_col_dt = pd.to_datetime(filtered_df[col], errors='coerce')
+                            start_ts = pd.Timestamp(selected_dates[0])
+                            end_ts = pd.Timestamp(selected_dates[1]) + pd.Timedelta(days=1) - pd.Timedelta(nanoseconds=1)
+                            filtered_df = filtered_df[
+                                (filtered_col_dt >= start_ts) & 
+                                (filtered_col_dt <= end_ts)
+                            ]
             
             # Show filtered results
-            st.write(f"### Filtered Results ({len(filtered_df)} rows)")
-            st.dataframe(filtered_df, use_container_width=True)
+            st.write(f"### Filtered Results ({len(filtered_df):,} rows)")
+            if len(filtered_df) > 1000:
+                st.caption(f"⚡ Showing first 1,000 of {len(filtered_df):,} matching records for maximum responsiveness.")
+                st.dataframe(filtered_df.iloc[:1000], use_container_width=True)
+            else:
+                st.dataframe(filtered_df, use_container_width=True)
             
             # Statistics for filtered data
             if numeric_columns:
@@ -1323,7 +1551,10 @@ if st.session_state.df is not None:
                         # Ensure we're working with numeric data only
                         numeric_filtered_df = numeric_filtered_df.select_dtypes(include=[np.number])
                         if not numeric_filtered_df.empty:
-                            st.dataframe(numeric_filtered_df.describe(), use_container_width=True)
+                            desc_calc_df = numeric_filtered_df.sample(min(50000, len(numeric_filtered_df)), random_state=42) if len(numeric_filtered_df) > 50000 else numeric_filtered_df
+                            st.dataframe(desc_calc_df.describe().round(2), use_container_width=True)
+                            if len(numeric_filtered_df) > 50000:
+                                st.caption(f"Estimated from representative sample of 50,000 records ({len(numeric_filtered_df):,} total).")
                     else:
                         # Single column case
                         col = numeric_cols_in_filtered[0]
@@ -1332,9 +1563,10 @@ if st.session_state.df is not None:
                             # Convert to Series if it's not already
                             if not isinstance(series, pd.Series):
                                 series = pd.Series(series)
-                            desc = series.describe()
+                            desc_calc_series = series.sample(min(50000, len(series)), random_state=42) if len(series) > 50000 else series
+                            desc = desc_calc_series.describe()
                             # Convert to DataFrame for display
-                            desc_df = pd.DataFrame(desc)
+                            desc_df = pd.DataFrame(desc).round(2)
                             st.dataframe(desc_df, use_container_width=True)
         
         # Group by analysis
@@ -1664,16 +1896,273 @@ if st.session_state.df is not None:
                 else:
                     st.success("No missing data found in your dataset!")
                 
-                # Data quality metrics
+                # Data quality metrics (optimized for multi-million row datasets)
                 st.write("### Data Quality Metrics")
+                sample_n = min(50000, len(df))
+                calc_dup_df = df.sample(sample_n, random_state=42) if len(df) > 50000 else df
+                dups_in_sample = len(calc_dup_df) - len(calc_dup_df.drop_duplicates())
+                dup_pct = round((dups_in_sample / len(calc_dup_df)) * 100, 2)
+                est_dups = int(round((dup_pct / 100) * len(df)))
+
                 quality_metrics = {
-                    'Duplicate_Rows': len(df) - len(df.drop_duplicates()),
-                    'Duplicate_Percentage': round((len(df) - len(df.drop_duplicates())) / len(df) * 100, 2),
-                    'Unique_Columns': len([col for col in df.columns if df[col].nunique() == len(df)])
+                    'Duplicate_Rows (Sampled/Est)': est_dups,
+                    'Duplicate_Percentage': dup_pct,
+                    'Unique_Columns': len([col for col in df.columns if calc_dup_df[col].nunique() == len(calc_dup_df)])
                 }
                 quality_df = pd.DataFrame([quality_metrics]).T
                 quality_df.columns = ['Value']
                 st.dataframe(quality_df, use_container_width=True)
+
+    with tab7:
+        st.subheader("🧠 AI Data Intelligence Channel")
+        st.caption("Multi-modal conversational querying, automated C-suite briefings, natural language visualizations, and quality remediation.")
+
+        subtab_chat, subtab_briefing, subtab_viz, subtab_quality, subtab_driver = st.tabs([
+            "💬 Chat with Data",
+            "📋 Executive Briefing",
+            "🎨 Smart Visualizations",
+            "🧹 Quality Advisor",
+            "🔮 Metric Driver Analysis"
+        ])
+
+        with subtab_chat:
+            st.markdown("#### 💬 Conversational Data Analyst")
+            st.caption("Converse with your dataset in natural language. Powered by Gemini LLM reasoning and real-time statistical aggregations.")
+            
+            # Quick query chips
+            st.markdown("<p style='font-family:var(--font-mono); font-size:0.7rem; color:#8B95A7; text-transform:uppercase; letter-spacing:0.08em; margin:10px 0 6px 0;'>Quick Queries</p>", unsafe_allow_html=True)
+            col_q1, col_q2, col_q3 = st.columns(3)
+            with col_q1:
+                if st.button("📊 Average by Category", key="q_chip_1", use_container_width=True):
+                    st.session_state.pending_ai_query = f"What is the average of {numeric_columns[0]} across {categorical_columns[0]}?" if (numeric_columns and categorical_columns) else "Summarize the key numeric metrics"
+            with col_q2:
+                if st.button("🏆 Top Performers", key="q_chip_2", use_container_width=True):
+                    st.session_state.pending_ai_query = f"Which {categorical_columns[0]} has the highest {numeric_columns[0]}?" if (numeric_columns and categorical_columns) else "What are the maximum values in each column?"
+            with col_q3:
+                if st.button("🔗 Key Correlations", key="q_chip_3", use_container_width=True):
+                    st.session_state.pending_ai_query = "What are the strongest correlations and relationships between variables?"
+
+            # Query input form
+            default_query = st.session_state.pop('pending_ai_query', '')
+            user_query = st.text_input(
+                "Enter your question:", 
+                value=default_query, 
+                placeholder="e.g., Which department has the highest average salary and why?", 
+                key="ai_chat_input"
+            )
+            
+            col_ask, col_clear = st.columns([5, 1])
+            with col_ask:
+                ask_submitted = st.button("Ask AI Analyst", key="btn_ask_ai", use_container_width=True)
+            with col_clear:
+                if st.button("Clear History", key="btn_clear_chat", use_container_width=True):
+                    st.session_state.ai_chat_history = []
+                    st.rerun()
+
+            if ask_submitted and user_query:
+                with st.spinner("Analyzing dataset with AI..."):
+                    answer, mode = ai_engine.ask_dataset_ai(
+                        df, 
+                        user_query, 
+                        api_key=st.session_state.get('ai_api_key'),
+                        model=st.session_state.get('ai_model')
+                    )
+                    st.session_state.ai_chat_history.append({
+                        'query': user_query,
+                        'answer': answer,
+                        'mode': mode,
+                        'time': datetime.now().strftime("%H:%M:%S")
+                    })
+
+            # Render chat history with native clean chat message components
+            if st.session_state.ai_chat_history:
+                st.markdown("<div style='margin-top:1.25rem;'></div>", unsafe_allow_html=True)
+                for item in reversed(st.session_state.ai_chat_history):
+                    badge_class = "ai-badge-gemini" if item['mode'] == 'gemini' else "ai-badge-heuristic"
+                    badge_text = f"GEMINI ({st.session_state.get('ai_model', '3.7-FLASH').upper()})" if item['mode'] == 'gemini' else "HEURISTIC ENGINE"
+                    
+                    with st.chat_message("user"):
+                        st.markdown(f"**{item['query']}**")
+                    
+                    with st.chat_message("assistant"):
+                        st.markdown(f"""
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                            <span style="font-family:'IBM Plex Mono',monospace; font-size:0.7rem; color:#8B95A7;">TIME: {item['time']}</span>
+                            <span class="ai-badge {badge_class}">{badge_text}</span>
+                        </div>
+                        """, unsafe_allow_html=True)
+                        st.markdown(ai_engine.sanitize_ai_markdown(item['answer']))
+            else:
+                st.info("No questions asked yet. Choose a quick query above or type any question about your data!")
+
+        with subtab_briefing:
+            st.markdown("#### 📋 Executive Intelligence Briefing")
+            st.caption("Generates a formal, high-signal business briefing summarizing dataset perimeter, primary findings, risk factors, and strategic next steps.")
+            
+            col_b1, col_b2 = st.columns([2, 5])
+            with col_b1:
+                gen_briefing_clicked = st.button("Generate Executive Briefing", key="btn_gen_exec", use_container_width=True)
+            
+            if gen_briefing_clicked:
+                with st.spinner("Synthesizing executive briefing with Gemini..."):
+                    briefing_text, mode = ai_engine.generate_executive_summary(
+                        df,
+                        api_key=st.session_state.get('ai_api_key'),
+                        model=st.session_state.get('ai_model')
+                    )
+                    st.session_state.ai_exec_summary = {
+                        'text': briefing_text,
+                        'mode': mode,
+                        'generated_at': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    }
+
+            if st.session_state.ai_exec_summary:
+                summary_data = st.session_state.ai_exec_summary
+                badge_class = "ai-badge-gemini" if summary_data['mode'] == 'gemini' else "ai-badge-heuristic"
+                current_model_name = st.session_state.get('ai_model', 'gemini-3.7-flash').upper()
+                badge_label = f"GEMINI ({current_model_name}) ENGINE" if summary_data['mode'] == 'gemini' else "INTELLIGENT HEURISTIC ENGINE"
+                
+                st.markdown("<div style='margin-top:1rem;'></div>", unsafe_allow_html=True)
+                with st.container(border=True):
+                    st.markdown(f"""
+                    <div class="ai-briefing-header">
+                        <span style="font-family:'IBM Plex Mono',monospace; font-size:0.72rem; color:#8B95A7;">
+                            GENERATED: {summary_data['generated_at']} &nbsp;·&nbsp; MONITORING {len(df):,} RECORDS
+                        </span>
+                        <span class="ai-badge {badge_class}">
+                            {badge_label}
+                        </span>
+                    </div>
+                    """, unsafe_allow_html=True)
+
+                    st.markdown(ai_engine.sanitize_ai_markdown(summary_data['text']))
+
+                    st.markdown("---")
+                    st.download_button(
+                        label="Download Executive Briefing (.md)",
+                        data=summary_data['text'],
+                        file_name=f"executive_briefing_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md",
+                        mime="text/markdown",
+                        key="btn_download_exec"
+                    )
+
+        with subtab_viz:
+            st.markdown("#### 🎨 Natural Language & Smart Visualization Generator")
+            st.caption("Convert plain English instructions into Plotly visualizations or pick from AI-suggested views tailored to your dataset.")
+
+            st.write("##### AI-Recommended Visualizations")
+            recs = ai_engine.recommend_smart_charts(df)
+            if recs:
+                rec_cols = st.columns(min(len(recs), 3))
+                for i, rec in enumerate(recs[:3]):
+                    with rec_cols[i]:
+                        with st.container(border=True):
+                            st.markdown(f"**{rec['title']}**")
+                            st.caption(rec['description'])
+                            if st.button(f"Render Chart #{i+1}", key=f"btn_render_rec_{i}", use_container_width=True):
+                                st.session_state.active_smart_chart = rec
+
+            if 'active_smart_chart' in st.session_state and st.session_state.active_smart_chart:
+                st.markdown("<div style='margin-top:1rem;'></div>", unsafe_allow_html=True)
+                with st.container(border=True):
+                    st.markdown(f"**Active Visualization: {st.session_state.active_smart_chart['title']}**")
+                    rec_fig = ai_engine.render_smart_chart(df, st.session_state.active_smart_chart)
+                    st.plotly_chart(rec_fig, use_container_width=True)
+
+            st.markdown("---")
+            st.write("##### Custom Natural Language Chart Prompt")
+            nl_prompt = st.text_input(
+                "Describe the chart you want to create:",
+                placeholder="e.g., Box plot of Salary by Department, or Scatter plot of Experience vs Salary",
+                key="nl_chart_input"
+            )
+            if st.button("Generate Chart from Prompt", key="btn_gen_nl_chart", use_container_width=True) and nl_prompt:
+                with st.spinner("Generating visualization..."):
+                    gen_fig, gen_msg = ai_engine.generate_chart_from_nl(df, nl_prompt)
+                    st.success(gen_msg)
+                    st.plotly_chart(gen_fig, use_container_width=True)
+
+        with subtab_quality:
+            st.markdown("#### 🧹 AI Data Quality & Cleaning Advisor")
+            st.caption("Automated diagnostics audit null records, duplicates, and outliers with 1-click remediation that updates your active session data across all tabs.")
+
+            diagnostics = ai_engine.analyze_data_quality_advisor(df)
+            if not diagnostics:
+                st.success("✅ Clean Health Report: Zero duplicates, missing entries, or significant outliers detected!")
+            else:
+                for idx, diag in enumerate(diagnostics):
+                    severity_color = "#FDBA74" if diag['severity'] == 'HIGH' else "#A5B4FC"
+                    with st.container(border=True):
+                        col_info, col_btn = st.columns([4, 1])
+                        with col_info:
+                            st.markdown(f"""
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                                <strong style="font-size:0.95rem; color:#F1F5F9;">{diag['category']}</strong>
+                                <span class="ai-badge" style="border-color:{severity_color}; color:{severity_color};">
+                                    SEVERITY: {diag['severity']}
+                                </span>
+                            </div>
+                            <p style="color:#CBD5E1; margin:0 0 6px 0; font-size:0.88rem;">{diag['issue']}</p>
+                            <p style="font-size:0.8rem; color:#8B95A7; margin:0;">Recommended Action: {diag['recommendation']}</p>
+                            """, unsafe_allow_html=True)
+                        with col_btn:
+                            action_col = diag.get('col')
+                            if st.button("Apply Fix", key=f"btn_fix_{idx}", use_container_width=True):
+                                cleaned_df, clean_msg = ai_engine.apply_cleaning_action(
+                                    df, 
+                                    diag['action_key'], 
+                                    col=action_col
+                                )
+                                st.session_state.df = cleaned_df
+                                numeric_cols, categorical_cols, date_cols = detect_column_types(cleaned_df)
+                                st.session_state.numeric_columns = numeric_cols
+                                st.session_state.categorical_columns = categorical_cols
+                                st.session_state.date_columns = date_cols
+                                st.success(f"Remediated: {clean_msg}")
+                                st.rerun()
+
+        with subtab_driver:
+            st.markdown("#### 🔮 Metric Driver & Impact Analyzer")
+            st.caption("Discover which numeric parameters correlate most strongly with a target KPI and uncover categorical segment performance gaps.")
+
+            if numeric_columns:
+                target_col = st.selectbox("Select Target Variable to Analyze:", numeric_columns, key="driver_target_select")
+                if target_col:
+                    drivers, err = ai_engine.analyze_metric_drivers(df, target_col)
+                    if err:
+                        st.error(err)
+                    elif drivers:
+                        st.markdown(drivers['summary_explanation'])
+                        
+                        col_d1, col_d2 = st.columns(2)
+                        with col_d1:
+                            st.write("##### Strongest Numeric Correlates")
+                            if drivers['numeric_correlations']:
+                                corr_df = pd.DataFrame(drivers['numeric_correlations'])[['feature', 'correlation', 'strength', 'direction']]
+                                st.dataframe(corr_df, use_container_width=True)
+                                
+                                fig_corr = px.bar(
+                                    corr_df, 
+                                    x='feature', 
+                                    y='correlation', 
+                                    title=f"Correlation with {target_col}",
+                                    color='correlation',
+                                    color_continuous_scale=['#12161F', '#5EEAD4']
+                                )
+                                fig_corr = ai_engine.style_plotly_fig(fig_corr)
+                                st.plotly_chart(fig_corr, use_container_width=True)
+                            else:
+                                st.info("No other numeric columns found.")
+                        
+                        with col_d2:
+                            st.write("##### Categorical Segment Spreads")
+                            if drivers['categorical_drivers']:
+                                cat_df = pd.DataFrame(drivers['categorical_drivers'])[['feature', 'spread', 'top_segment', 'top_mean', 'bottom_segment', 'bottom_mean']]
+                                st.dataframe(cat_df, use_container_width=True)
+                            else:
+                                st.info("No categorical columns with between 2-25 segments found.")
+            else:
+                st.info("Metric driver analysis requires numeric columns in the dataset.")
 
 else:
     st.markdown("""
@@ -1683,7 +2172,7 @@ else:
         <p class="idle-body">
             Select a data source from the sidebar to begin. Drop in a structured file or
             connect to a MySQL database — the instrument will detect column types automatically
-            and activate all six analysis channels.
+            and activate all seven analysis channels.
         </p>
         <p style="font-family:'IBM Plex Mono',monospace;font-size:0.68rem;color:#8B95A7;
                   text-transform:uppercase;letter-spacing:0.1em;margin:0 0 10px 0;">

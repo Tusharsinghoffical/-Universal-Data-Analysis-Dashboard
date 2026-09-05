@@ -7,16 +7,17 @@ This is a universal, dynamic, interactive dashboard built with Streamlit for ana
 ## Key Features
 
 - 🌟 **Universal Compatibility**: Works with ANY dataset structure
+- 🧠 **AI Data Intelligence**: Conversational data querying, automated briefings, smart chart generation, quality advisor, and metric driver analysis
 - 📁 **Multi-Format Support**: Excel, CSV, JSON, Parquet, Feather files
 - 🤖 **Auto Column Detection**: Automatically identifies numeric, categorical, and date columns
 - 📊 **Interactive Visualizations**: Dynamic charts and graphs
 - 🔍 **Smart Insights**: Automatic correlation analysis and key findings
 - ⚙️ **Flexible Filtering**: Analyze specific data subsets
-- 🎨 **Premium UI Design**: Gold accents, gradient effects, glass-morphism
+- 🎨 **Instrument Panel UI Design**: Space Grotesk, IBM Plex Mono readouts, and cyan phosphor accent styling
 - 🗄️ **MySQL Connectivity**: Connect to any MySQL database
-- 📤 **Export Ready**: Download reports and visualizations
-- 🤖 **Advanced Analytics**: Machine learning capabilities
-- 📈 **Data Profiling**: Comprehensive dataset analysis
+- 📤 **Export Ready**: Download executive briefings, reports, and visualizations
+- 🤖 **Advanced Analytics**: Machine learning capabilities (clustering, PCA, anomalies, regression)
+- 📈 **Data Profiling**: Comprehensive dataset quality and health analysis
 
 ## Supported File Formats
 
@@ -84,15 +85,14 @@ This is a universal, dynamic, interactive dashboard built with Streamlit for ana
 ## Project Structure
 
 ```
-├── app.py                 # Main Streamlit application
-├── config.py              # Configuration settings
-├── database_schema.sql    # MySQL database schema
+├── app.py                 # Main Streamlit application & interactive UI
+├── ai_engine.py           # AI Intelligence Engine (Gemini & Heuristic Fallback)
+├── config.py              # Configuration settings & MySQL defaults
+├── database_schema.sql    # MySQL database schema & sample seed data
 ├── employee_data_sample.xlsx  # Sample data file
 ├── requirements.txt       # Python dependencies
 ├── sample_data.py         # Sample data generator
-├── utils.py               # Utility functions
-├── test_dashboard.py      # Test script
-├── verify_installation.py # Installation verification
+├── utils.py               # Statistical computations & utility functions
 ├── .env.example          # Environment variables template
 ├── STYLE_GUIDE.md        # Design consistency guide
 ├── README.md             # Documentation
@@ -102,6 +102,7 @@ This is a universal, dynamic, interactive dashboard built with Streamlit for ana
 ## Technologies Used
 
 - **Streamlit** - For creating the web dashboard
+- **Google Gemini API** - Advanced generative LLM reasoning (`gemini-2.5-flash` / `gemini-1.5-flash`)
 - **Pandas** - For data manipulation and analysis
 - **Plotly** - For interactive data visualization
 - **MySQL Connector** - For MySQL database connectivity
@@ -213,16 +214,11 @@ The `database_schema.sql` file contains:
 - Sample data insertion
 - Useful queries for dashboard integration
 
-## Testing
+## Running the Application
 
-Run the test suite with:
+Launch the Streamlit dashboard:
 ```bash
-python test_dashboard.py
-```
-
-Run the installation verification with:
-```bash
-python verify_installation.py
+streamlit run app.py
 ```
 
 ## Requirements
